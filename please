@@ -1,0 +1,16 @@
+#!/bin/bash
+# @author CFR
+# The go-to script: use it! Do not use the other scripts directly.
+#
+
+WHEREAMI=`dirname "$0"`
+
+if [ $# -eq 0 ]; then
+	php $WHEREAMI/tools/console.php "$WHEREAMI"
+	exit
+fi
+
+RUNNABLE=$1.php
+shift
+
+php $WHEREAMI/tools/$RUNNABLE $@

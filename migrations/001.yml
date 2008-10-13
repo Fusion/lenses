@@ -1,0 +1,192 @@
+---
+up: 
+    create: 
+        -   name: dict
+            info: |
+                
+                id              I               AUTO KEY,
+                language        CHAR(2)         NOTNULL,
+                token           VARCHAR(16)     NOTNULL,
+                translation     TEXT            NOTNULL,
+                context         VARCHAR(8)      NOTNULL DEFAULT ''
+                
+        -   name: downloads
+            info: |
+                
+                id              I               AUTO KEY,
+                filename        VARCHAR(32)     NOTNULL,
+                counter         I               NOTNULL DEFAULT 0
+                
+        -   name: invitemes
+            info: |
+                
+                id              I               AUTO KEY,
+                email           VARCHAR(128)    NOTNULL
+                
+        -   name: invites
+            info: |
+                
+                id              I               AUTO KEY,
+                code            VARCHAR(32)     NOTNULL,
+                member_id       I               NOTNULL,
+                used            BOOLEAN         DEFAULT false
+                
+        -   name: members
+            info: |
+                
+                id              I               AUTO KEY,
+                username        VARCHAR(64)     NOTNULL,
+                password        VARCHAR(64)     NOTNULL,
+                email           VARCHAR(128)    DEFAULT '',
+                openid_url      VARCHAR(255)    DEFAULT '',
+                persist_key     VARCHAR(64),
+                admin           BOOLEAN         DEFAULT false,
+                avatar_uri      VARCHAR(255)    DEFAULT '',
+                avatar_width    I               DEFAULT 0,
+                avatar_height   I               DEFAULT 0,
+                url             TEXT            DEFAULT '',
+                protected       BOOLEAN         DEFAULT false
+                
+        -   name: modules
+            info: |
+                
+                id              I               AUTO KEY,
+                type            VARCHAR(1)      NOTNULL DEFAULT '',
+                name            VARCHAR(64)     NOTNULL DEFAULT '',
+                `default`       BOOLEAN         NOTNULL DEFAULT false
+                
+        -   name: sessions
+            info: |
+                
+                sesskey         VARCHAR(64)     DEFAULT '' KEY,
+                expiry          T               DEFAULT '0000-00-00 00:00:00' INDEX sess2_expiry,
+                expireref       VARCHAR(250)    DEFAULT '' INDEX sess2_expireref,
+                created         T               DEFAULT '0000-00-00 00:00:00',
+                modified        T               DEFAULT '0000-00-00 00:00:00',
+                sessdata        LONGTEXT
+                
+        -   name: settings
+            info: |
+                
+                id              I               AUTO KEY,
+                name            VARCHAR(100)    NOTNULL INDEX settings_name,
+                value           TEXT            NOTNULL default '',
+                description     TEXT            NOTNULL,
+                type            VARCHAR(1)      NOTNULL DEFAULT 'a',
+                options         TEXT,
+                `group`         I               NOTNULL DEFAULT '0'
+                
+        -   name: undo
+            info: |
+                
+                id              I               AUTO KEY,
+                session_id      VARCHAR(64)     NOTNULL,
+                object          BLOB            NOTNULL,
+                class           VARCHAR(64)     NOTNULL default ''
+                
+    execute: 
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES ('en','admin_panel','Admin
+                Panel','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES ('en','nav_homepage','HOMEPAGE','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES
+                ('en','nav_statistics','STATISTICS','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES ('en','nav_users','USERS','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES ('en','nav_content','CONTENT','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES ('en','nav_exit','EXIT','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES ('en','nav_members','Members','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES ('en','nav_invites','Invites','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES
+                ('en','nav_downloads','Downloads','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES
+                ('en','h_statistics','Statistics','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES ('en','h_users','Users','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES
+                ('en','nav_registration','Registration','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES ('en','h_content','Content','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES ('en','nav_areas','Areas','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES
+                ('en','nav_attachments','Attachments','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES ('en','nav_index','Index','admincp')
+        -
+            query: >
+                INSERT INTO `dict` (`language`, `token`, `translation`,
+                `context`) VALUES ('en','nav_top','Top','admincp')
+        -
+            query: >
+                INSERT INTO `settings` (`name`, `value`, `description`, `type`, `options`, `group`) VALUES
+                ('users.registration.requireinvite','No','Are invites required to be allowed to register?','S','Yes|No',0)
+        -
+            query: >
+                INSERT INTO `settings` (`name`, `value`, `description`, `type`, `options`, `group`) VALUES
+                ('users.registration.captcha.privatekey','','reCAPTCHA Private Key','A','?',2)
+        -
+            query: >
+                INSERT INTO `settings` (`name`, `value`, `description`, `type`, `options`, `group`) VALUES
+                ('users.registration.captcha.publickey','','reCAPTCHA Public Key','A','?',2)
+        -
+            query: >
+                INSERT INTO `modules` (`type`, `name`, `default`) VALUES
+                ('E','nicEdit',false)
+        -
+            query: >
+                INSERT INTO `modules` (`type`, `name`, `default`) VALUES
+                ('E','plain',true)
+down: 
+    drop: 
+        -   name: dict
+        -   name: downloads
+        -   name: invitemes
+        -   name: invites
+        -   name: members
+        -   name: modules
+        -   name: sessions
+        -   name: settings
+        -   name: undo

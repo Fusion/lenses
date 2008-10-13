@@ -1,0 +1,22 @@
+.clean-info {
+	border-bottom: 1px solid #ddd;
+    background: #eee;
+    padding: 4px;
+	text-align:center;
+}
+.clean-ok {
+	border-bottom: 1px solid #ddd;
+	background:#C9FFCA;
+	color:#008000;
+	font-weight:bold;
+	padding:4px;
+	text-align:center;
+}
+.clean-error {
+	border-bottom: 1px solid #ddd;
+	background:#F7CBCA;
+	color:#CC0000;
+	font-weight:bold;
+	padding:4px;
+	text-align:center;
+}
