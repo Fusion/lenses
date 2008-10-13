@@ -8,13 +8,6 @@
 		<link rel="stylesheet" type="text/css" media="screen" href="<?=Config::$path?>views/assets/default.css" />
 		<script type="text/javascript" src="<?=Config::$path?>libs/jquery.js"></script>
 		<script type="text/javascript" src="<?=Config::$path?>libs/util.js"></script>
-		<!-- Light Box -->
-		<link rel="stylesheet" type="text/css" media="screen" href="<?=Config::$path?>libs/shadow/css/shadowbox.css" />
-		<script type="text/javascript" src="<?=Config::$path?>libs/shadow/js/shadowbox-jquery.js"></script>
-		<script type="text/javascript" src="<?=Config::$path?>libs/shadow/js/shadowbox.js"></script>
-		<!-- Forms -->
-		<link rel="stylesheet" type="text/css" media="screen" href="<?=Config::$path?>libs/uniform/css/uni-form.css" />
-		<script type="text/javascript" src="<?=Config::$path?>libs/uniform/js/uni-form.jquery.js"></script>
 
 		<script>
 		<?php print $addjs; ?>

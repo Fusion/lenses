@@ -1,0 +1,64 @@
+body {
+	margin: 0;
+	padding: 0;
+	background: #FFFFFF;
+	font: normal small "Trebuchet MS", Arial, Helvetica, sans-serif;
+	color: #666666;
+}
+
+h1, h2, h3, h4, h5, h6, form {
+	margin: 0;
+	padding: 0;
+}
+
+h1, h2, h3 {
+}
+
+h4, h5, h6 {
+}
+
+p, ul, ol, blockquote {
+	margin-top: 0;
+}
+
+a {
+	color: #268ED4;
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+img {
+	border: none;
+}
+
+/* Content */
+
+#main {
+	display: block;
+	position: absolute;
+	width: 100%;
+	min-height: 100%;
+}
+
+#content {
+	width: 760px;
+	margin: 0 auto;
+	padding: 20px 0 0 0;
+}
+
+/* Footer */
+#footer {
+	position:absolute;
+	display: block;
+	bottom:0;
+	width:760px;
+	height:20px;
+	background:#F7F7F7;
+	text-align:center;
+	padding-top: 7px;
+	padding-left: 10px;
+	padding-right: 10px;
+}
