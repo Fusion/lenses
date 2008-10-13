@@ -1,0 +1,6 @@
+This product will be open-sourced and it is very likely that commercial use will be ok.
+This is the first check-in; here is its current license blurb, until we decide on a good license.
+[ Note: help with picking a license is appreciated! BSD? MIT? MPL? Simple Creative Commons...? ]
+--- Begin blurb
+This is a preview of a framework as-of-yet unreleased. Permission is granted to you, the user, to use this framework on as many machines as desired. Permission is not granted, however, to redistribute this product or any derived work.
+--- End blurb
