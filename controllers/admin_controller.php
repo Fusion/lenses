@@ -1,4 +1,9 @@
 <?php
+/**
+ * @package Lenses
+ * @copyright (c) Chris F. Ravenscroft
+ * @license See 'license.txt'
+ */
 
 class AdminController extends ApplicationController
 {

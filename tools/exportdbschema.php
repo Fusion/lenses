@@ -1,4 +1,9 @@
 <?php
+/**
+ * @package Lenses
+ * @copyright (c) Chris F. Ravenscroft
+ * @license See 'license.txt'
+ */
 // Dump the schema of a MySQL dump
 
 require 'tools/__dbclass.php';

@@ -1,4 +1,9 @@
 <?
+/**
+ * @package Lenses
+ * @copyright (c) Chris F. Ravenscroft
+ * @license See 'license.txt'
+ */
 class Inflector
 {
 	var $_inflectee;

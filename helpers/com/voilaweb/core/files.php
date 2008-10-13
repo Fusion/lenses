@@ -1,4 +1,9 @@
 <?php
+/**
+ * @package Lenses
+ * @copyright (c) Chris F. Ravenscroft
+ * @license See 'license.txt'
+ */
 class FileException extends Exception
 {
 private $_type;

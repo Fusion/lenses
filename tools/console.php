@@ -1,4 +1,9 @@
 <?php
+/**
+ * @package Lenses
+ * @copyright (c) Chris F. Ravenscroft
+ * @license See 'license.txt'
+ */
 if(empty($_ENV['SHELL'])) die("This script if meant for the command line only.\n");
 if(empty($argv[1])) die("Use 'please' rather than invoking this script directly!\n");
 global $WHEREAMI;

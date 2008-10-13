@@ -1,3 +1,9 @@
+/**
+ * @package Lenses
+ * @copyright (c) Chris F. Ravenscroft
+ * @license See 'license.txt'
+ */
+
 notify_view = function(notify_msg)
 {
 	if(parent)

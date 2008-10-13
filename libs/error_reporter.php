@@ -1,4 +1,9 @@
 <?php
+/**
+ * @package Lenses
+ * @copyright (c) Chris F. Ravenscroft
+ * @license See 'license.txt'
+ */
 $nbbs_vars = array();
 $used_vars = array();
 $runner = 0;
