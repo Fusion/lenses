@@ -41,6 +41,9 @@ class Config
 			// Email error notifications to developer?
 			$notifyonerror	= true,
 
+			$webcli         = false,
+			$webcliips	= array(),
+
 			// Special context remapping
 			$altroutes	= array(
 				// ...or how a context can be remapped

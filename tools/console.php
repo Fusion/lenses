@@ -4,10 +4,31 @@
  * @copyright (c) Chris F. Ravenscroft
  * @license See 'license.txt'
  */
-if(empty($_ENV['SHELL'])) die("This script if meant for the command line only.\n");
-if(empty($argv[1])) die("Use 'please' rather than invoking this script directly!\n");
-global $WHEREAMI;
-$WHEREAMI = $argv[1];
+global $WHEREAMI, $medium;
+$postinput = '';
+if(empty($_ENV['SHELL']))
+{
+	// Web invocation
+	$WHEREAMI = dirname(getcwd());
+	include($WHEREAMI.'/config.php');
+	$ip = $_SERVER['REMOTE_ADDR'];
+	if(!Config::$webcli || !in_array($ip, Config::$webcliips))
+		die("Sorry, command-line only!");
+	$medium = 'w';
+	$prompt = '<body onload="document.getElementById(\'input\').focus();"><form method="post" action="console.php">Console > <input type="text" name="input" id="input" value="" style="width:800px;" /></form>';
+	if(!empty($_POST['input']))
+		$postinput = $_POST['input'];
+}
+else
+{
+	// Shell
+	if(empty($argv[1]))
+		die("Use 'please' rather than invoking this script directly!\n");
+	$WHEREAMI = $argv[1];
+	include($WHEREAMI.'/config.php');
+	$medium = 'c';
+	$prompt = 'Console > ';
+}
 $cli = array(
 	'halp' => 'lolcat',
 	'create' => array(
@@ -63,20 +84,24 @@ $cli = array(
 			'-1' => 'migrate down <version>',
 			'1' => "migrate_model_down"),
 	),
-	'undo' => 'oops',
 );
 
-$prompt = 'Console > ';
 $depth = 0;
 
-echo "Welcome to the Console. Type '.' to exit.\n";
+$innerWelcome = ($medium == 'w' ? '' : "Type '.' to exit.");
+echo _format("Welcome to the Console. $innerWelcome\n");
 
 $stdin = fopen('php://stdin', 'r');
-echo $prompt;
+echo _format($prompt);
 $tokens = array();
 $incomplete = false;
-while($line = fgets($stdin))
+while(($line = fgets($stdin)) || !empty($postinput))
 {
+	if(!empty($postinput))
+	{
+		$line = $postinput;
+		$postinput = '';
+	}
 	$probe = &$cli;
 	$collectingArgs = false;
 	$args = array();
@@ -84,7 +109,7 @@ while($line = fgets($stdin))
 	if(empty($line))
 	{
 		$incomplete = false;
-		echo $prompt;
+		echo _format($prompt);
 		continue;
 	}
 	if($line == '.') break;
@@ -148,20 +173,20 @@ while($line = fgets($stdin))
 		}
 		else
 		{
-			echo "Syntax error: {$token}?\n";
+			echo _format("Syntax error: {$token}?\n");
 			break;
 		}
 	}
 	if($incomplete)
 	{
 		$comma = '';
-		echo "Syntax: " . implode(' ', $tokens) . " < ";
+		echo _format("Syntax: " . implode(' ', $tokens) . " < ");
 		foreach($probe as $potentialToken => $whatever)
 		{
-			echo "$comma$potentialToken";
+			echo _format("$comma$potentialToken");
 			$comma = ' | ';
 		}
-		echo " >\n";
+		echo _format(" >\n");
 	}
 	else if($collectingArgs)
 	{
@@ -173,18 +198,34 @@ while($line = fgets($stdin))
 		}
 		else
 		{
-			echo "Wrong number of arguments: ".$arrptr[-1]."\n";
+			echo _format("Wrong number of arguments: ".$arrptr[-1]."\n");
 			$incomplete = true;
 		}
 	}
-	echo $prompt;
+	if($medium != 'w')
+		echo $prompt;
 	if($incomplete)
 	{
-		echo implode(' ', $tokens) . ' ';
+		$value = implode(' ', $tokens) . ' ';
+		if($value == ' ') $value = '';
+		if($medium != 'w')
+			echo $value;
+		else
+			echo "<script>\ndocument.getElementById('input').value = '$value';\n</script>\n";
 	}
 }
 
-echo "Good bye!\n";
+if($medium != 'w')
+	echo _format("Good bye!\n");
+
+function _format($str)
+{
+global $medium;
+
+	if($medium == 'w')
+		$str = str_replace("\n", "<br />\n", $str);
+	return $str;
+}
 
 function _ensure_context($contextname)
 {
@@ -194,7 +235,7 @@ global $WHEREAMI;
 	{
 		if(is_dir($WHEREAMI.'/app/'.$contextname))
 			return true;
-		echo "This context exists but it's a file, not a directory!\n";
+		echo _format("This context exists but it's a file, not a directory!\n");
 		return false;
 	}
 	if(
@@ -204,7 +245,7 @@ global $WHEREAMI;
 		!mkdir($WHEREAMI.'/app/'.$contextname.'/views')
 	)
 	{
-		echo "Problem creating context '$contextname'\n";
+		echo _format("Problem creating context '$contextname'\n");
 		return false;
 	}
 	return true;
@@ -219,12 +260,12 @@ global $WHEREAMI;
 	$f = fopen($filename, 'w+');
 	if(!$f)
 	{
-		echo "Unable to create $filename\n";
+		echo _format("Unable to create $filename\n");
 		return false;
 	}
 	if(!fputs($f, $contents))
 	{
-		echo "Unable to create contents of $filename\n";
+		echo _format("Unable to create contents of $filename\n");
 		return false;
 	}
 	fclose($f);
@@ -236,7 +277,6 @@ function _open_db()
 	global $db, $WHEREAMI;
 	if(!isset($db))
 	{
-		include($WHEREAMI.'/config.php');
 		include($WHEREAMI.'/libs/adodb/adodb.inc.php');
 		$db = NewADOConnection(
 			Config::$dbengine.'://'.
@@ -247,7 +287,7 @@ function _open_db()
 	}
 	if(!$db)
 	{
-		echo "Unable to access database. Bad configuration in config.php?\n";
+		echo _format("Unable to access database. Bad configuration in config.php?\n");
 		return false;
 	}
 	return true;
@@ -276,14 +316,13 @@ function _create_yml_parser()
 
 function lolcat($args)
 {
-	echo "Lolcat says 'I can have halp?' but noz Lolcat kant\n";
-	echo "However, Lolcat can enter '.' to exit the console.\n";
+	echo _format("Type '?' for a short syntax help message.\n");
 }
 
 
 function create_model($args)
 {
-	if(empty($args)) { echo "Argument please! ([contextname] <modelname>)\n"; return false; }
+	if(empty($args)) { echo _format("Argument please! ([contextname] <modelname>)\n"); return false; }
 	if(count($args)>1)
 	{
 		$contextname = $args[0];
@@ -309,13 +348,13 @@ class {$classname} extends ActiveRecord
 ?>
 EOB;
 	if(!_create_file($filename, $contents)) return false;
-	echo "Model: Success.\n";
+	echo _format("Model: Success.\n");
 	return true;
 }
 
 function create_controller($args)
 {
-	if(empty($args)) { echo "Argument please! ([contextname] <controllername>)\n"; return false; }
+	if(empty($args)) { echo _format("Argument please! ([contextname] <controllername>)\n"); return false; }
 	if(count($args)>1)
 	{
 		$contextname = $args[0];
@@ -340,13 +379,13 @@ class {$classname} extends ApplicationController
 ?>
 EOB;
 	if(!_create_file($filename, $contents)) return false;
-	echo "Controller: Success.\n";
+	echo _format("Controller: Success.\n");
 	return true;
 }
 
 function create_view($args)
 {
-	if(empty($args)) { echo "Argument please! ([contextname] <viewname> <pagename>)\n"; return false; }
+	if(empty($args)) { echo _format("Argument please! ([contextname] <viewname> <pagename>)\n"); return false; }
 	if(count($args)>2)
 	{
 		$contextname = $args[0];
@@ -361,7 +400,7 @@ function create_view($args)
 		$pagename    = $args[1];
 		$pathname    = 'views/'.$viewname;
 	}
-	if(!mkdir($pathname)) { echo "Problem creating view '$pathname'\n"; return false; }
+	if(!mkdir($pathname)) { echo _format("Problem creating view '$pathname'\n"); return false; }
 	$contents = <<<EOB
 <?php
 if(\$message_type!=MESSAGE_ERROR):
@@ -372,7 +411,7 @@ endif
 ?>
 EOB;
 	if(!_create_file($pathname.'/'.$pagename.'.html.php', $contents)) return false;
-	echo "View: Success.\n";
+	echo _format("View: Success.\n");
 	return true;
 }
 
@@ -382,7 +421,7 @@ function create_mvc($args)
 	if(!create_controller($args)) return false;
 	array_push($args, 'index');
 	if(!create_view($args)) return false;
-	echo "All created.\n";
+	echo _format("All created.\n");
 	return true;
 }
 
@@ -401,10 +440,10 @@ function create_setting($args)
 		addslashes($description)."')";
 	if(!$db->execute($qry))
 	{
-		echo "Unable to create setting '$name'.\n";
+		echo _format("Unable to create setting '$name'.\n");
 		return false;
 	}
-	echo "Setting '$name' created.\n";
+	echo _format("Setting '$name' created.\n");
 	return true;
 }
 
@@ -417,10 +456,10 @@ function delete_setting($args)
 	$qry = "DELETE FROM settings WHERE name='{$name}'";
 	if(!$db->execute($qry))
 	{
-		echo "Unable to delete setting '$name'.\n";
+		echo _format("Unable to delete setting '$name'.\n");
 		return false;
 	}
-	echo "Setting '$name' deleted.\n";
+	echo _format("Setting '$name' deleted.\n");
 	return true;
 }
 
@@ -437,12 +476,12 @@ function show_setting($args = null)
 	$qry = 'SELECT * FROM settings';
 	if(!empty($args)) $qry .= " WHERE `name` like '{$args[0]}%'";
 	$rs = &$db->execute($qry);
-	echo "\n";
+	echo _format("\n");
 	while(!$rs->EOF)
 	{
-		echo	"Description:\t".$rs->fields['description']."\n".
+		echo	_format("Description:\t".$rs->fields['description']."\n".
 			"Name:\t\t".$rs->fields['name']."\n".
-			"Value:\t\t".$rs->fields['value']."\n\n";
+			"Value:\t\t".$rs->fields['value']."\n\n");
 		$rs->moveNext();
 	}
 	return true;
@@ -465,7 +504,7 @@ function _m_execute($qry)
 	if(!_open_db()) return false;
 	if(!$db->execute($qry))
 	{
-		echo "! Error executing '$qry'\n";
+		echo _format("! Error executing '$qry'\n");
 		return false;
 	}
 	return true;
@@ -489,7 +528,7 @@ function _m_query($qry)
 	$rs = &$db->execute($qry);
 	if(!$rs)
 	{
-		echo "! Error executing '$qry'\n";
+		echo _format("! Error executing '$qry'\n");
 		return false;
 	}
 	$ret = array();
@@ -508,14 +547,14 @@ function _m_create_table($table_name, $field_defs)
 	$sql = $dict->CreateTableSQL($table_name, $field_defs, array());
 	if(!$sql)
 	{
-		echo "! Error creating table '$table_name'\n";
+		echo _format("! Error creating table '$table_name'\n");
 		return false;
 	}
 	foreach($sql as $qry)
 	{
 		if(!$db->execute($qry))
 		{
-			echo "! Error creating table '$table_name':\n\"$qry\"\n";
+			echo _format("! Error creating table '$table_name':\n\"$qry\"\n");
 			return false;
 		}
 	}
@@ -530,14 +569,14 @@ function _m_drop_table($table_name)
 	$sql = $dict->DropTableSQL($table_name);
 	if(!$sql)
 	{
-		echo "! Error dropping table '$table_name'\n";
+		echo _format("! Error dropping table '$table_name'\n");
 		return false;
 	}
 	foreach($sql as $qry)
 	{
 		if(!$db->execute($qry))
 		{
-			echo "! Error dropping table '$table_name':\n\"$qry\"\n";
+			echo _format("! Error dropping table '$table_name':\n\"$qry\"\n");
 			return false;
 		}
 	}
@@ -599,14 +638,14 @@ function _prepare_to_migrate()
 	$row = _m_query("SELECT * FROM `system` WHERE `setting`='version'");
 	if(count($row) != 1)
 	{
-		echo "! Wrong row number when reading version from system table\n";
+		echo _format("! Wrong row number when reading version from system table\n");
 		return false;
 	}
 	$curVersion  = intval($row[0]['value']);
 	if(0 > $curVersion)
 	{
-		echo "Sorry, but it appears that the database got corrupted while trying to migrate to version ".
-			(-1 * $curVersion).".\nThe database needs to be fixed before any new migration.\n";
+		echo _format("Sorry, but it appears that the database got corrupted while trying to migrate to version ".
+			(-1 * $curVersion).".\nThe database needs to be fixed before any new migration.\n");
 		return false;
 	}
 	return $curVersion;
@@ -619,7 +658,7 @@ global $WHEREAMI;
 	$targetVersion = intval($args[0]);
 	if(0 > $targetVersion)
 	{
-		echo "Wrong parameter for version number\n";
+		echo _format("Wrong parameter for version number\n");
 		return false;
 	}
 	$curVersion = _prepare_to_migrate();
@@ -627,7 +666,7 @@ global $WHEREAMI;
 		return false;
 	if($curVersion <= $targetVersion)
 	{
-		echo "Nothing to do: current version=$curVersion, target version=$targetVersion\n";
+		echo _format("Nothing to do: current version=$curVersion, target version=$targetVersion\n");
 		return true;
 	}
 	$nextVersion = $curVersion - 1;
@@ -638,9 +677,9 @@ global $WHEREAMI;
 			$fName = $WHEREAMI . '/migrations/' . sprintf('%03d', ($nextVersion + 1)) . '.yml';
 			if(!file_exists($fName))
 				break;
-			echo "----------------------------------------\n";
-			echo "Migrating from version $curVersion to version $nextVersion\n";
-			echo "----------------------------------------\n";
+			echo _format("----------------------------------------\n");
+			echo _format("Migrating from version $curVersion to version $nextVersion\n");
+			echo _format("----------------------------------------\n");
 			_create_yml_parser();
 			$arr = Spyc::YAMLLoad($fName);
 			$down   = &$arr['down'];
@@ -654,11 +693,11 @@ global $WHEREAMI;
 	{
 		// Oh no I failed! Store wannabe version number...with a twist: it's negative!
 		_m_execute("UPDATE `system` SET `value`=".(-1 * $nextVersion)." WHERE `setting`='version'");
-		echo "Alas, there was an issue migrating from #$curVersion to $nextVersion!\n";
+		echo _format("Alas, there was an issue migrating from #$curVersion to $nextVersion!\n");
 		return false;
 	}
 	_m_execute("UPDATE `system` SET `value`=".($nextVersion + 1)." WHERE `setting`='version'");
-	echo "Database fully migrated to version ".($nextVersion + 1).".\n";
+	echo _format("Database fully migrated to version ".($nextVersion + 1).".\n");
 	return true;
 }
 
@@ -672,7 +711,7 @@ global $WHEREAMI;
 		$targetVersion = 999999;
 	if(0 >= $targetVersion)
 	{
-		echo "Wrong parameter for version number\n";
+		echo _format("Wrong parameter for version number\n");
 		return false;
 	}
 	$curVersion = _prepare_to_migrate();
@@ -680,7 +719,7 @@ global $WHEREAMI;
 		return false;
 	if($curVersion >= $targetVersion)
 	{
-		echo "Nothing to do: current version=$curVersion, target version=$targetVersion\n";
+		echo _format("Nothing to do: current version=$curVersion, target version=$targetVersion\n");
 		return true;
 	}
 	$nextVersion = $curVersion + 1;
@@ -691,9 +730,9 @@ global $WHEREAMI;
 			$fName = $WHEREAMI . '/migrations/' . sprintf('%03d', $nextVersion) . '.yml';
 			if(!file_exists($fName))
 				break;
-			echo "----------------------------------------\n";
-			echo "Migrating from version $curVersion to version $nextVersion\n";
-			echo "----------------------------------------\n";
+			echo _format("----------------------------------------\n");
+			echo _format("Migrating from version $curVersion to version $nextVersion\n");
+			echo _format("----------------------------------------\n");
 			_create_yml_parser();
 			$arr = Spyc::YAMLLoad($fName);
 			$up   = &$arr['up'];
@@ -707,11 +746,11 @@ global $WHEREAMI;
 	{
 		// Oh no I failed! Store wannabe version number...with a twist: it's negative!
 		_m_execute("UPDATE `system` SET `value`=".(-1 * $nextVersion)." WHERE `setting`='version'");
-		echo "Alas, there was an issue migrating from #$curVersion to $nextVersion!\n";
+		echo _format("Alas, there was an issue migrating from #$curVersion to $nextVersion!\n");
 		return false;
 	}
 	_m_execute("UPDATE `system` SET `value`=".($nextVersion - 1)." WHERE `setting`='version'");
-	echo "\n# Database fully migrated to version ".($nextVersion - 1).".\n";
+	echo _format("\n# Database fully migrated to version ".($nextVersion - 1).".\n");
 	return true;
 }
 ?>
