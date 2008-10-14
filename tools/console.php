@@ -206,8 +206,10 @@ while(($line = fgets($stdin)) || !empty($postinput))
 		echo $prompt;
 	if($incomplete)
 	{
-		$value = implode(' ', $tokens) . ' ';
-		if($value == ' ') $value = '';
+		if(0 < count($tokens))
+			$value = implode(' ', $tokens) . ' ';
+		else
+			$value = '';
 		if($medium != 'w')
 			echo $value;
 		else
