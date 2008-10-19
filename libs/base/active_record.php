@@ -11,12 +11,16 @@ class ActiveRecord extends ADOdb_Active_Record implements ApplicationModel
 {
 	var $name;
 
-	function __construct($modelname = null)
+	function __construct($modelname = false)
 	{
 		global $inflector;
+		/*
+		 *  No: let db layer take care of this. 
 		if(empty($modelname))
 			$modelname = get_class($this);
 		parent::__construct($inflector->inflectee($modelname)->pluralized()->is());
+		 */
+		parent::__construct($modelname);
 		$this->name = get_class($this);
 	}
 

@@ -52,6 +52,7 @@ class Config
 				'main'		=>	'',
 				'user'		=>	'',
 				'test'		=>	'',
+				'song'		=>	'',
 			);
 
 	static public $settings;

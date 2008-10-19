@@ -1,7 +1,7 @@
 <?php
 /*
 
-@version V5.04a 25 Mar 2008   (c) 2000-2008 John Lim (jlim#natsoft.com.my). All rights reserved.
+@version V5.06 29 Sept 2008   (c) 2000-2008 John Lim (jlim#natsoft.com). All rights reserved.
   Latest version is available at http://adodb.sourceforge.net
  
   Released under both BSD license and Lesser GPL library license. 
@@ -23,7 +23,7 @@ global $ADODB_ACTIVE_DEFVALS; // use default values of table definition when cre
 
 // array of ADODB_Active_DB's, indexed by ADODB_Active_Record->_dbat
 $_ADODB_ACTIVE_DBS = array();
-$ACTIVE_RECORD_SAFETY = false; // CFR: disabled while playing with relations
+$ACTIVE_RECORD_SAFETY = true; // CFR: disabled while playing with relations
 $ADODB_ACTIVE_DEFVALS = false;
 
 class ADODB_Active_DB {
@@ -36,6 +36,18 @@ class ADODB_Active_Table {
 	var $flds; // assoc array of adofieldobjs, indexed by fieldname
 	var $keys; // assoc array of primary keys, indexed by fieldname
 	var $_created; // only used when stored as a cached file
+	var $_belongsTo = array();
+	var $_hasMany = array();
+	var $_colsCount; // total columns count, including relations
+
+	function updateColsCount()
+	{
+		$this->_colsCount = sizeof($this->flds);
+		foreach($this->_belongsTo as $foreignTable)
+			$this->_colsCount += sizeof($foreignTable->TableInfo()->flds);
+		foreach($this->_hasMany as $foreignTable)
+			$this->_colsCount += sizeof($foreignTable->TableInfo()->flds);
+	}
 }
 
 // returns index into $_ADODB_ACTIVE_DBS
@@ -63,16 +75,18 @@ function ADODB_SetDatabaseAdapter(&$db)
 
 
 class ADODB_Active_Record {
+	static $_changeNames = true; // dynamically pluralize table names
+	static $_foreignSuffix = '_id'; // 
 	var $_dbat; // associative index pointing to ADODB_Active_DB eg. $ADODB_Active_DBS[_dbat]
 	var $_table; // tablename, if set in class definition then use it as table name
+	var $_sTable; // singularized table name
+	var $_pTable; // pluralized table name
 	var $_tableat; // associative index pointing to ADODB_Active_Table, eg $ADODB_Active_DBS[_dbat]->tables[$this->_tableat]
 	var $_where; // where clause set in Load()
 	var $_saved = false; // indicates whether data is already inserted.
 	var $_lasterr = false; // last error message
 	var $_original = false; // the original values loaded or inserted, refreshed on update
-	
-	var $_hasMany; // CFR: Relationships
-	var $_belongsTo; // CFR: Relationships
+
 	var $foreignName; // CFR: class name when in a relationship
 
 	static function UseDefaultValues($bool=null)
@@ -96,7 +110,16 @@ class ADODB_Active_Record {
 	}
 	
 	// php5 constructor
-	function __construct($table = false, $pkeyarr=false, $db=false)
+	// Note: if $table is defined, then we will use it as our table name
+	// Otherwise we will use our classname...
+	// In our database, table names are pluralized (because there can be
+	// more than one row!)
+	// Similarly, if $table is defined here, it has to be plural form.
+	//
+	// $options is an array that allows us to tweak the constructor's behaviour
+	// if $options['refresh'] is true, we re-scan our metadata information
+	// if $options['new'] is true, we forget all relations
+	function __construct($table = false, $pkeyarr=false, $db=false, $options=array())
 	{
 	global $ADODB_ASSOC_CASE,$_ADODB_ACTIVE_DBS;
 	
@@ -105,11 +128,24 @@ class ADODB_Active_Record {
 			$pkeyarr = false;
 		}
 		
-		if (!$table) { 
-			if (!empty($this->_table)) $table = $this->_table;
-			else $table = $this->_pluralize(get_class($this));
+		if($table)
+		{
+			// table argument exists. It is expected to be
+			// already plural form.
+			$this->_pTable = $table;
+			$this->_sTable = $this->_singularize($this->_pTable);
 		}
-		$this->foreignName = strtolower(get_class($this)); // CFR: default foreign name
+		else
+		{
+			// We will use current classname as table name.
+			// We need to pluralize it for the real table name.
+			$this->_sTable = strtolower(get_class($this));
+			$this->_pTable = $this->_pluralize($this->_sTable);
+		}
+		$this->_table = &$this->_pTable;
+
+		$this->foreignName = $this->_sTable; // CFR: default foreign name (singular)
+
 		if ($db) {
 			$this->_dbat = ADODB_Active_Record::SetDatabaseAdapter($db);
 		} else
@@ -118,13 +154,20 @@ class ADODB_Active_Record {
 		
 		if ($this->_dbat < 0) $this->Error("No database connection set; use ADOdb_Active_Record::SetDatabaseAdapter(\$db)",'ADODB_Active_Record::__constructor');
 		
-		$this->_table = $table;
-		$this->_tableat = $table; # reserved for setting the assoc value to a non-table name, eg. the sql string in future
+		$this->_tableat = $this->_table; # reserved for setting the assoc value to a non-table name, eg. the sql string in future
 
-		$this->_hasMany = array(); // CFR
-		$this->_belongsTo = array(); // CFR
-
-		$this->UpdateActiveTable($pkeyarr);
+		// CFR: Just added this option because UpdateActiveTable() can refresh its information
+		// but there was no way to ask it to do that.
+		$forceUpdate = (isset($options['refresh']) && true === $options['refresh']);
+		$this->UpdateActiveTable($pkeyarr, $forceUpdate);
+		if(isset($options['new']) && true === $options['new']);
+		{
+			$table =& $this->TableInfo();
+			unset($table->_hasMany);
+			unset($table->_belongsTo);
+			$table->_hasMany = array();
+			$table->_belongsTo = array();
+		}
 	}
 	
 	function __wakeup()
@@ -133,9 +176,47 @@ class ADODB_Active_Record {
   		new $class;
 	}
 	
+	// CFR: Constants found in Rails
+	static $IrregularP = array(
+		'PERSON'    => 'people',
+		'MAN'       => 'men',
+		'WOMAN'     => 'women',
+		'CHILD'     => 'children',
+		'COW'       => 'kine',
+	);
+
+	static $IrregularS = array(
+		'PEOPLE'    => 'PERSON',
+		'MEN'       => 'man',
+		'WOMEN'     => 'woman',
+		'CHILDREN'  => 'child',
+		'KINE'      => 'cow',
+	);
+
+	static $WeIsI = array(
+		'EQUIPMENT' => true,
+		'INFORMATION'   => true,
+		'RICE'      => true,
+		'MONEY'     => true,
+		'SPECIES'   => true,
+		'SERIES'    => true,
+		'FISH'      => true,
+		'SHEEP'     => true,
+	);
+
 	function _pluralize($table)
 	{
+		if (!ADODB_Active_Record::$_changeNames) return $table;
+
 		$ut = strtoupper($table);
+		if(isset(self::$WeIsI[$ut]))
+		{
+			return $table;
+		}
+		if(isset(self::$IrregularP[$ut]))
+		{
+			return self::$IrregularP[$ut];
+		}
 		$len = strlen($table);
 		$lastc = $ut[$len-1];
 		$lastc2 = substr($ut,$len-2);
@@ -156,47 +237,88 @@ class ADODB_Active_Record {
 	
 	// CFR Lamest singular inflector ever - @todo Make it real!
 	// Note: There is an assumption here...and it is that the argument's length >= 4
-	function _singularize($tables)
+	function _singularize($table)
 	{
-		$ut = strtoupper($tables);
-		$len = strlen($tables);
+	
+		if (!ADODB_Active_Record::$_changeNames) return $table;
+	
+		$ut = strtoupper($table);
+		if(isset(self::$WeIsI[$ut]))
+		{
+			return $table;
+		}
+		if(isset(self::$IrregularS[$ut]))
+		{
+			return self::$IrregularS[$ut];
+		}
+		$len = strlen($table);
 		if($ut[$len-1] != 'S')
-			return $tables; // I know...forget oxen
+			return $table; // I know...forget oxen
 		if($ut[$len-2] != 'E')
-			return substr($tables, 0, $len-1);
+			return substr($table, 0, $len-1);
 		switch($ut[$len-3])
 		{
 			case 'S':
 			case 'X':
-				return substr($tables, 0, $len-2);
+				return substr($table, 0, $len-2);
 			case 'I':
-				return substr($tables, 0, $len-3) . 'y';
+				return substr($table, 0, $len-3) . 'y';
 			case 'H';
 				if($ut[$len-4] == 'C' || $ut[$len-4] == 'S')
-					return substr($tables, 0, $len-2);
+					return substr($table, 0, $len-2);
 			default:
-				return substr($tables, 0, $len-1); // ?
+				return substr($table, 0, $len-1); // ?
 		}
 	}
 
-	function hasMany($foreignRef)
+	/*
+	 * ar->foreignName will contain the name of the tables associated with this table because
+	 * these other tables' rows may also be referenced by this table using theirname_id or the provided
+	 * foreign keys (this index name is stored in ar->foreignKey)
+	 *
+	 * this-table.id = other-table-#1.this-table_id
+	 *               = other-table-#2.this-table_id
+	 */
+	function hasMany($foreignRef,$foreignKey=false)
 	{
 		$ar = new ADODB_Active_Record($foreignRef);
 		$ar->foreignName = $foreignRef;
 		$ar->UpdateActiveTable();
-		$this->_hasMany[$foreignRef] = $ar;
-		$this->$foreignRef = $this->_hasMany[$foreignRef]; // WATCHME Removed assignment by ref. to please __get()
+		$ar->foreignKey = ($foreignKey) ? $foreignKey : strtolower(get_class($this)) . self::$_foreignSuffix;
+
+		$table =& $this->TableInfo();
+		if(!isset($table->_hasMany[$foreignRef]))
+		{
+			$table->_hasMany[$foreignRef] = $ar;
+			$table->updateColsCount();
+		}
+# @todo Can I make this guy be lazy?
+		$this->$foreignRef = $table->_hasMany[$foreignRef]; // WATCHME Removed assignment by ref. to please __get()
 	}
 
-	function belongsTo($foreignRef)
+	/**
+	 * ar->foreignName will contain the name of the tables associated with this table because
+	 * this table's rows may also be referenced by those tables using thistable_id or the provided
+	 * foreign keys (this index name is stored in ar->foreignKey)
+	 *
+	 * this-table.other-table_id = other-table.id
+	 */
+	function belongsTo($foreignRef,$foreignKey=false)
 	{
 		global $inflector;
 
 		$ar = new ADODB_Active_Record($this->_pluralize($foreignRef));
 		$ar->foreignName = $foreignRef;
 		$ar->UpdateActiveTable();
-		$this->_belongsTo[$foreignRef] = $ar;
-		$this->$foreignRef = $this->_belongsTo[$foreignRef];
+		$ar->foreignKey = ($foreignKey) ? $foreignKey : $ar->foreignName . self::$_foreignSuffix;
+		
+		$table =& $this->TableInfo();
+		if(!isset($table->_belongsTo[$foreignRef]))
+		{
+			$table->_belongsTo[$foreignRef] = $ar;
+			$table->updateColsCount();
+		}
+		$this->$foreignRef = $table->_belongsTo[$foreignRef];
 	}
 
 	/**
@@ -208,26 +330,37 @@ class ADODB_Active_Record {
 	 */
 	function __get($name)
 	{
-		if(!empty($this->_belongsTo[$name]))
+		return $this->LoadRelations($name, '', -1. -1);
+	}
+
+	function LoadRelations($name, $whereOrderBy, $offset=-1, $limit=-1)
+	{
+		$extras = array();
+		if($offset >= 0) $extras['offset'] = $offset;
+		if($limit >= 0) $extras['limit'] = $limit;
+		$table =& $this->TableInfo();
+		if(!empty($table->_belongsTo[$name]))
 		{
-			$obj = $this->_belongsTo[$name];
-			$columnName = $name . '_id';
+			$obj = $table->_belongsTo[$name];
+			$columnName = $obj->foreignKey;
 			if(empty($this->$columnName))
-				$this->_belongsTo[$name] = null;
+				$this->$name = null;
 			else
 			{
-				$arrayOfOne = $obj->Find('id='.$this->$columnName);
-				$this->_belongsTo[$name] = $arrayOfOne[0];
+				$arrayOfOne =
+					$obj->Find(
+						'id='.$this->$columnName.' '.$whereOrderBy, false, false, $extras);
+				$this->$name = $arrayOfOne[0];
 			}
-			$this->$name = $this->_belongsTo[$name];
-			return $this->_belongsTo[$name];
+			return $this->$name;
 		}
-		if(!empty($this->_hasMany[$name]))
+		if(!empty($table->_hasMany[$name]))
 		{
-			$obj = $this->_hasMany[$name];
-			$this->_hasMany[$name] = $obj->Find($this->foreignName.'_id='.$this->id);
-			$this->$name = $this->_hasMany[$name];
-			return $this->_hasMany[$name];
+			$obj = $table->_hasMany[$name];
+			$this->$name =
+				$obj->Find(
+					$obj->foreignKey.'='.$this->id.' '.$whereOrderBy, false, false, $extras);
+			return $this->$name;
 		}
 	}
 	//////////////////////////////////
@@ -348,12 +481,19 @@ class ADODB_Active_Record {
 		
 		$activetab->keys = $keys;
 		$activetab->flds = $attr;
+		$activetab->updateColsCount();
 
 		if ($ADODB_ACTIVE_CACHESECS && $ADODB_CACHE_DIR) {
 			$activetab->_created = time();
 			$s = serialize($activetab);
 			if (!function_exists('adodb_write_file')) include(ADODB_DIR.'/adodb-csvlib.inc.php');
 			adodb_write_file($fname,$s);
+		}
+		if (isset($activedb->tables[$table])) {
+			$oldtab = $activedb->tables[$table];
+		
+			if ($oldtab) $activetab->_belongsTo = $oldtab->_belongsTo;
+			if ($oldtab) $activetab->_hasMany = $oldtab->_hasMany;
 		}
 		$activedb->tables[$table] = $activetab;
 	}
@@ -423,7 +563,7 @@ class ADODB_Active_Record {
 	}
 	
 	// retrieve ADODB_Active_Table
-	function TableInfo()
+	function &TableInfo()
 	{
 	global $_ADODB_ACTIVE_DBS;
 	
@@ -431,6 +571,18 @@ class ADODB_Active_Record {
 		$table = $activedb->tables[$this->_tableat];
 		return $table;
 	}
+	
+	
+	// I have an ON INSERT trigger on a table that sets other columns in the table.
+	// So, I find that for myTable, I want to reload an active record after saving it. -- Malcolm Cook
+	function Reload()
+	{
+		$db =& $this->DB(); if (!$db) return false;
+		$table =& $this->TableInfo();
+		$where = $this->GenWhere($db, $table);
+		return($this->Load($where));
+	}
+
 	
 	// set a numeric array (using natural table field ordering) as object properties
 	function Set(&$row)
@@ -447,10 +599,12 @@ class ADODB_Active_Record {
 		$this->_saved = true;
 		
 		$table = $this->TableInfo();
-		if ($ACTIVE_RECORD_SAFETY && sizeof($table->flds) != sizeof($row)) {
+		$sizeofFlds = sizeof($table->flds);
+		$sizeofRow  = sizeof($row);
+		if ($ACTIVE_RECORD_SAFETY && $table->_colsCount != $sizeofRow && $sizeofFlds != $sizeofRow) {
             # <AP>
             $bad_size = TRUE;
-            if (sizeof($row) == 2 * sizeof($table->flds)) {
+	if($sizeofRow == 2 * $table->_colsCount || $sizeofRow == 2 * $sizeofFlds) {
                 // Only keep string keys
                 $keys = array_filter(array_keys($row), 'is_string');
                 if (sizeof($keys) == sizeof($table->flds))
@@ -472,20 +626,22 @@ class ADODB_Active_Record {
             $value = $row[current($keys)];
 			$this->$name = $value;
             $this->_original[] = $value;
-            next($keys);
+            if(!next($keys)) break;
 		}
-		foreach($this->_belongsTo as $foreignTable)
+		$table =& $this->TableInfo();
+		foreach($table->_belongsTo as $foreignTable)
 		{
 			$ft = $foreignTable->TableInfo();
+			$propertyName = $ft->name;
 			foreach($ft->flds as $name=>$fld)
 			{
 				$value = $row[current($keys)];
 				$foreignTable->$name = $value;
 				$foreignTable->_original[] = $value;
-				next($keys);
+				if(!next($keys)) break;
 			}
 		}
-		foreach($this->_hasMany as $foreignTable)
+		foreach($table->_hasMany as $foreignTable)
 		{
 			$ft = $foreignTable->TableInfo();
 			foreach($ft->flds as $name=>$fld)
@@ -493,7 +649,7 @@ class ADODB_Active_Record {
 				$value = $row[current($keys)];
 				$foreignTable->$name = $value;
 				$foreignTable->_original[] = $value;
-				next($keys);
+				if(!next($keys)) break;
 			}
 		}
         # </AP>
@@ -562,17 +718,32 @@ class ADODB_Active_Record {
 		
 		$save = $db->SetFetchMode(ADODB_FETCH_NUM);
 		$qry = "select * from ".$this->_table;
-		foreach($this->_belongsTo as $foreignTable)
+		$table =& $this->TableInfo();
+
+		if(($k = reset($table->keys)))
+			$hasManyId   = $k;
+		else
+			$hasManyId   = 'id';
+		
+		foreach($table->_belongsTo as $foreignTable)
 		{
+			if(($k = reset($foreignTable->TableInfo()->keys)))
+			{
+				$belongsToId = $k;
+			}
+			else
+			{
+				$belongsToId = 'id';
+			}
 			$qry .= ' LEFT JOIN '.$foreignTable->_table.' ON '.
-				$this->_table.'.'.$foreignTable->foreignName.'_id='.
-				$foreignTable->_table.'.id';
+				$this->_table.'.'.$foreignTable->foreignKey.'='.
+				$foreignTable->_table.'.'.$belongsToId;
 		}
-		foreach($this->_hasMany as $foreignTable)
+		foreach($table->_hasMany as $foreignTable)
 		{
 			$qry .= ' LEFT JOIN '.$foreignTable->_table.' ON '.
-				$this->_table.'.id='.
-				$foreignTable->_table.'.'.$this->foreignName.'_id';
+				$this->_table.'.'.$hasManyId.'='.
+				$foreignTable->_table.'.'.$foreignTable->foreignKey;
 		}
 		if($where)
 			$qry .= ' WHERE '.$where;
@@ -665,8 +836,9 @@ class ADODB_Active_Record {
 	function Find($whereOrderBy,$bindarr=false,$pkeysArr=false,$extra=array())
 	{
 		$db = $this->DB(); if (!$db || empty($this->_table)) return false;
-		$arr = $db->GetActiveRecordsClass(get_class($this),$this->_table, $whereOrderBy,$bindarr,$pkeysArr,$extra,
-			array('foreignName'=>$this->foreignName, 'belongsTo'=>$this->_belongsTo, 'hasMany'=>$this->_hasMany));
+		$table =& $this->TableInfo();
+		$arr = $db->GetActiveRecordsClass(get_class($this),$this, $whereOrderBy,$bindarr,$pkeysArr,$extra,
+			array('foreignName'=>$this->foreignName, 'belongsTo'=>$table->_belongsTo, 'hasMany'=>$table->_hasMany));
 		return $arr;
 	}
 	
@@ -677,8 +849,9 @@ class ADODB_Active_Record {
 	function packageFind($whereOrderBy,$bindarr=false,$pkeysArr=false,$extra=array())
 	{
 		$db = $this->DB(); if (!$db || empty($this->_table)) return false;
-		$arr = $db->GetActiveRecordsClass(get_class($this),$this->_table, $whereOrderBy,$bindarr,$pkeysArr,$extra,
-			array('foreignName'=>$this->foreignName, 'belongsTo'=>$this->_belongsTo, 'hasMany'=>$this->_hasMany));
+		$table =& $this->TableInfo();
+		$arr = $db->GetActiveRecordsClass(get_class($this),$this, $whereOrderBy,$bindarr,$pkeysArr,$extra,
+			array('foreignName'=>$this->foreignName, 'belongsTo'=>$table->_belongsTo, 'hasMany'=>$table->_hasMany));
 		return $arr;
 	}
 
