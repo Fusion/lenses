@@ -2251,60 +2251,63 @@
 			{
 				if(ADODB_JOIN_AR == $extra['loading'])
 				{
-					if(isset($uniqArr['_'.$row[0]]))
+					$isNewObj = !isset($uniqArr['_'.$row[0]]); 
+					if($isNewObj)
+						$uniqArr['_'.$row[0]] = $obj;
+
+					// TODO Copy/paste code below: bad!
+					if(!empty($relations['hasMany']))
 					{
-						// TODO Copy/paste code below: bad!
-						if(!empty($relations['hasMany']))
+						foreach($relations['hasMany'] as $foreignTable)
 						{
-							foreach($relations['hasMany'] as $foreignTable)
+							$foreignName = $foreignTable->foreignName;
+							if(!empty($obj->$foreignName))
 							{
-								$foreignName = $foreignTable->foreignName;
-								if(!empty($obj->$foreignName))
+								$masterObj = &$uniqArr['_'.$row[0]];
+								// Assumption: this property exists in every object since they are instances of the same class
+								if(!is_array($masterObj->$foreignName))
 								{
-									$masterObj = &$uniqArr['_'.$row[0]];
-									// Assumption: this property exists in every object since they are instances of the same class
-									if(!is_array($masterObj->$foreignName))
-									{
-										// Pluck!
-										$foreignObj = $masterObj->$foreignName;
-										$masterObj->$foreignName = array($foreignObj);
-									}
-									// Pluck pluck!
-									$foreignObj = $obj->$foreignName;
-									array_push($masterObj->$foreignName, $foreignObj);
-									// We do not need this object anymore
-									unset($obj);
+									// Pluck!
+									$foreignObj = $masterObj->$foreignName;
+									$masterObj->$foreignName = array(clone($foreignObj));
 								}
-							}
-						}
-						if(!empty($relations['belongsTo']))
-						{
-							foreach($relations['belongsTo'] as $foreignTable)
-							{
-								$foreignName = $foreignTable->foreignName;
-								if(!empty($obj->$foreignName))
+								else
 								{
-									$masterObj = &$uniqArr['_'.$row[0]];
-									// Assumption: this property exists in every object since they are instances of the same class
-									if(!is_array($masterObj->$foreignName))
-									{
-										// Pluck!
-										$foreignObj = $masterObj->$foreignName;
-										$masterObj->$foreignName = array($foreignObj);
-									}
 									// Pluck pluck!
 									$foreignObj = $obj->$foreignName;
-									array_push($masterObj->$foreignName, $foreignObj);
-									// We do not need this object anymore
-									unset($obj);
+									array_push($masterObj->$foreignName, clone($foreignObj));
 								}
 							}
 						}
 					}
-					else
-						$uniqArr['_'.$row[0]] = $obj;
+					if(!empty($relations['belongsTo']))
+					{
+						foreach($relations['belongsTo'] as $foreignTable)
+						{
+							$foreignName = $foreignTable->foreignName;
+							if(!empty($obj->$foreignName))
+							{
+								$masterObj = &$uniqArr['_'.$row[0]];
+								// Assumption: this property exists in every object since they are instances of the same class
+								if(!is_array($masterObj->$foreignName))
+								{
+									// Pluck!
+									$foreignObj = $masterObj->$foreignName;
+									$masterObj->$foreignName = array(clone($foreignObj));
+								}
+								else
+								{
+									// Pluck pluck!
+									$foreignObj = $obj->$foreignName;
+									array_push($masterObj->$foreignName, clone($foreignObj));
+								}
+							}
+						}
+					}
+					if(!$isNewObj)
+						unset($obj); // We do not need this object itself anymore and do not want it re-added to the main array					
 				}
-				else
+				else if(ADODB_LAZY_AR == $extra['loading'])
 				{
 					// Lazy loading: we need to give AdoDb a hint that we have not really loaded
 					// anything, all the while keeping enough information on what we wish to load.
@@ -2371,15 +2374,23 @@
 					$foreignTableRef = $foreignTable->foreignKey;
 					if(empty($bTos[$foreignTableRef]))
 						continue;
+					if(($k = reset($foreignTable->TableInfo()->keys)))
+					{
+						$belongsToId = $k;
+					}
+					else
+					{
+						$belongsToId = 'id';
+					}						
 					$origObjsArr = $bTos[$foreignTableRef];
 					$bTosString = implode(',', array_keys($bTos[$foreignTableRef]));
 					$foreignName = $foreignTable->foreignName;
 					$className = ucfirst($foreignTable->_singularize($foreignName));
 					$obj = new $className();
-					$objs = $obj->packageFind('id IN ('.$bTosString.')');
+					$objs = $obj->packageFind($belongsToId.' IN ('.$bTosString.')');
 					foreach($objs as $obj)
 					{
-						foreach($origObjsArr[$obj->id] as $idx=>$origObj)
+						foreach($origObjsArr[$obj->$belongsToId] as $idx=>$origObj)
 						{
 							$origObj->$foreignName = $obj;
 						}

@@ -24,7 +24,7 @@ abstract class Undo
 	static function store($object)
 	{
 		global $db;
-		$qry = "INSERT INTO undo(session_id, class, object) VALUES('".
+		$qry = "INSERT INTO undostack(session_id, class, object) VALUES('".
 			session_id()."','".
 			get_class($object)."','".
 			serialize($object)."')";
@@ -35,7 +35,7 @@ abstract class Undo
 	{
 		global $db;
 		$db->setFetchMode(ADODB_FETCH_ASSOC);
-		$qry = "SELECT * FROM undo WHERE session_id='".session_id()."' ORDER BY id DESC LIMIT 1";
+		$qry = "SELECT * FROM undostack WHERE session_id='".session_id()."' ORDER BY id DESC LIMIT 1";
         $rs = &$db->execute($qry);
 		if(!$rs) throw new Exception("Nothing to undo");
 		$object = unserialize($rs->fields['object']);

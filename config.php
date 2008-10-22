@@ -11,7 +11,7 @@ class Config
 			$developer	= 'bogus@voilaweb.com',
 
 			// Web application root path
-			$path		= '/fw/dev/',
+			$path		= '/lenses/',
 
 			// Database layer, engine, etc. as used by adodb
 			$dblayer	= 'native',

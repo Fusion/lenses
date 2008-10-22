@@ -3,7 +3,7 @@ class Member extends ActiveRecord
 {
 	function __construct()
 	{
-		parent::__construct('member');
+		parent::__construct();
 	}
 
 	static function encodePassword($password)

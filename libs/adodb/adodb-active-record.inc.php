@@ -160,7 +160,7 @@ class ADODB_Active_Record {
 		// but there was no way to ask it to do that.
 		$forceUpdate = (isset($options['refresh']) && true === $options['refresh']);
 		$this->UpdateActiveTable($pkeyarr, $forceUpdate);
-		if(isset($options['new']) && true === $options['new']);
+		if(isset($options['new']) && true === $options['new'])
 		{
 			$table =& $this->TableInfo();
 			unset($table->_hasMany);
@@ -347,9 +347,14 @@ class ADODB_Active_Record {
 				$this->$name = null;
 			else
 			{
+				if(($k = reset($obj->TableInfo()->keys)))
+					$belongsToId = $k;
+				else
+					$belongsToId = 'id';
+				
 				$arrayOfOne =
 					$obj->Find(
-						'id='.$this->$columnName.' '.$whereOrderBy, false, false, $extras);
+						$belongsToId.'='.$this->$columnName.' '.$whereOrderBy, false, false, $extras);
 				$this->$name = $arrayOfOne[0];
 			}
 			return $this->$name;
@@ -357,9 +362,14 @@ class ADODB_Active_Record {
 		if(!empty($table->_hasMany[$name]))
 		{
 			$obj = $table->_hasMany[$name];
+			if(($k = reset($table->keys)))
+				$hasManyId   = $k;
+			else
+				$hasManyId   = 'id';			
+
 			$this->$name =
 				$obj->Find(
-					$obj->foreignKey.'='.$this->id.' '.$whereOrderBy, false, false, $extras);
+					$obj->foreignKey.'='.$this->$hasManyId.' '.$whereOrderBy, false, false, $extras);
 			return $this->$name;
 		}
 	}
@@ -747,10 +757,83 @@ class ADODB_Active_Record {
 		}
 		if($where)
 			$qry .= ' WHERE '.$where;
-		$row = $db->GetRow($qry,$bindarr);
-		$db->SetFetchMode($save);
 		
-		return $this->Set($row);
+		// Simple case: no relations. Load row and return.
+		if((count($table->_hasMany) + count($table->_belongsTo)) < 1)
+		{
+			$row = $db->GetRow($qry,$bindarr);
+			if(!$row)
+				return false;
+			$db->SetFetchMode($save);
+			return $this->Set($row);
+		}
+		
+		// More complex case when relations have to be collated
+		$rows = $db->GetAll($qry,$bindarr);
+		if(!$rows)
+			return false;
+		$db->SetFetchMode($save);
+		if(count($rows) < 1)
+			return false;
+		$class = get_class($this);
+		$isFirstRow = true;
+		foreach($rows as $row)
+		{
+			$rowId = intval($row[0]);
+			if($rowId > 0)
+			{
+				if($isFirstRow)
+				{
+					$isFirstRow = false;
+					if(!$this->Set($row))
+						return false;
+				}
+				$obj = new $class($table,false,db);
+				$obj->Set($row);
+				// TODO Copy/paste code below: bad!
+				if(count($table->_hasMany) > 0)
+				{
+					foreach($table->_hasMany as $foreignTable)
+					{
+						$foreignName = $foreignTable->foreignName;
+						if(!empty($obj->$foreignName))
+						{
+							if(!is_array($this->$foreignName))
+							{
+								$foreignObj = $this->$foreignName;
+								$this->$foreignName = array(clone($foreignObj));
+							}
+							else
+							{
+								$foreignObj = $obj->$foreignName;
+								array_push($this->$foreignName, clone($foreignObj));
+							}
+						}
+					}
+				}
+				if(count($table->_belongsTo) > 0)
+				{
+					foreach($table->_belongsTo as $foreignTable)
+					{
+						$foreignName = $foreignTable->foreignName;
+						if(!empty($obj->$foreignName))
+						{
+							if(!is_array($this->$foreignName))
+							{
+								$foreignObj = $this->$foreignName;
+								$this->$foreignName = array(clone($foreignObj));
+							}
+							else
+							{
+								$foreignObj = $obj->$foreignName;
+								array_push($this->$foreignName, clone($foreignObj));
+							}
+						}
+					}
+				}				
+			}
+		}
+		return true;
 	}
 	
 	// false on error

@@ -29,7 +29,7 @@ up:
                 id              I               AUTO KEY,
                 code            VARCHAR(32)     NOTNULL,
                 member_id       I               NOTNULL,
-                used            BOOLEAN         DEFAULT false
+                used            BOOLEAN         DEFAULT 0
                 
         -   name: members
             info: |
@@ -40,12 +40,12 @@ up:
                 email           VARCHAR(128)    DEFAULT '',
                 openid_url      VARCHAR(255)    DEFAULT '',
                 persist_key     VARCHAR(64),
-                admin           BOOLEAN         DEFAULT false,
+                admin           BOOLEAN         DEFAULT 0,
                 avatar_uri      VARCHAR(255)    DEFAULT '',
                 avatar_width    I               DEFAULT 0,
                 avatar_height   I               DEFAULT 0,
                 url             TEXT            DEFAULT '',
-                protected       BOOLEAN         DEFAULT false
+                protected       BOOLEAN         DEFAULT 0
                 
         -   name: modules
             info: |
@@ -53,7 +53,7 @@ up:
                 id              I               AUTO KEY,
                 type            VARCHAR(1)      NOTNULL DEFAULT '',
                 name            VARCHAR(64)     NOTNULL DEFAULT '',
-                `default`       BOOLEAN         NOTNULL DEFAULT false
+                `default`       BOOLEAN         NOTNULL DEFAULT 0
                 
         -   name: sessions
             info: |
@@ -76,7 +76,7 @@ up:
                 options         TEXT,
                 `group`         I               NOTNULL DEFAULT '0'
                 
-        -   name: undo
+        -   name: undostack
             info: |
                 
                 id              I               AUTO KEY,
