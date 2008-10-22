@@ -2118,7 +2118,25 @@
 		$save = $this->SetFetchMode(ADODB_FETCH_NUM);
 		$table = &$tableObj->_table;
 		$tableInfo =& $tableObj->TableInfo();
-
+		if(($k = reset($tableInfo->keys)))
+			$myId   = $k;
+		else
+			$myId   = 'id';
+		$index = 0; $found = false;
+		/** @todo Improve by storing once and for all in table metadata */
+		/** @todo Also re-use info for hasManyId */
+		foreach($tableInfo->flds as $fld)
+		{
+			if($fld->name == $myId)
+			{
+				$found = true;
+				break;
+			}
+			$index++;
+		}
+		if(!$found)
+			$this->outp_throw("Unable to locate key $myId for $class in GetActiveRecordsClass()",'GetActiveRecordsClass');
+		
 		$qry = "select * from ".$table;
 		if(ADODB_JOIN_AR == $extra['loading'])
 		{
@@ -2218,7 +2236,7 @@
 			// instead of returning n objects with their n' associated cousins,
 			// we get n*n' objects. This code fixes this.
 			// Note: to-many relationships mess around with the 'limit' parameter
-			$rowId = intval($row[0]);
+			$rowId = intval($row[$index]);
 
 			if(ADODB_WORK_AR == $extra['loading'])
 			{

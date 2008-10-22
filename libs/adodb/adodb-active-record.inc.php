@@ -777,9 +777,29 @@ class ADODB_Active_Record {
 			return false;
 		$class = get_class($this);
 		$isFirstRow = true;
+		
+		if(($k = reset($this->TableInfo()->keys)))
+			$myId   = $k;
+		else
+			$myId   = 'id';
+		$index = 0; $found = false;
+		/** @todo Improve by storing once and for all in table metadata */
+		/** @todo Also re-use info for hasManyId */
+		foreach($this->TableInfo()->flds as $fld)
+		{
+			if($fld->name == $myId)
+			{
+				$found = true;
+				break;
+			}
+			$index++;
+		}
+		if(!$found)
+			$this->outp_throw("Unable to locate key $myId for $class in Load()",'Load');
+		
 		foreach($rows as $row)
 		{
-			$rowId = intval($row[0]);
+			$rowId = intval($row[$index]);
 			if($rowId > 0)
 			{
 				if($isFirstRow)

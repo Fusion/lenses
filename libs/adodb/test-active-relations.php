@@ -54,26 +54,26 @@ $err_count = 0;
 	            ) ENGINE=MyISAM;
 	           ");
 	$db->Execute("CREATE TABLE `children` (
-	                `id` int(10) unsigned NOT NULL auto_increment,
 					`person_id` int(10) unsigned NOT NULL,
 	                `name_first` varchar(100) NOT NULL default '',
 	                `name_last` varchar(100) NOT NULL default '',
 	                `favorite_pet` varchar(100) NOT NULL default '',
+	                `id` int(10) unsigned NOT NULL auto_increment,
 	                PRIMARY KEY  (`id`)
 	            ) ENGINE=MyISAM;
 	           ");
 	
 	$db->Execute("CREATE TABLE `artists` (
-	                `artistuniqueid` int(10) unsigned NOT NULL auto_increment,
 	                `name` varchar(100) NOT NULL default '',
+	                `artistuniqueid` int(10) unsigned NOT NULL auto_increment,
 	                PRIMARY KEY  (`artistuniqueid`)
 	            ) ENGINE=MyISAM;
 	           ");
 
 	$db->Execute("CREATE TABLE `songs` (
-	                `recordid` int(10) unsigned NOT NULL auto_increment,
 	                `name` varchar(100) NOT NULL default '',
 	                `artistid` int(10) NOT NULL,
+	                `recordid` int(10) unsigned NOT NULL auto_increment,
 	                PRIMARY KEY  (`recordid`)
 	            ) ENGINE=MyISAM;
 	           ");
