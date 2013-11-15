@@ -1,0 +1,19 @@
+{
+    "name": "voilaweb/lenses",
+    "type": "library",
+    "description": "A lightweight framework for PHP 5+",
+    "keywords": ["framework", "orm", "activerecords", "ajax", "mvc", "hmvc"],
+    "homepage": "http://github.com/fusion/lenses",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Chris Ravenscroft",
+            "email": "lenses@voilaweb.com",
+            "homepage": "http://nexus.zteo.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=5.0.1"
+    }
+}
